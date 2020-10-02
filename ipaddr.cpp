@@ -1,6 +1,8 @@
 #include <windows.h>
 #include <windowsx.h>
 #include <commctrl.h>
+#include <process.h>
+#include <stdio.h>
 #include <assert.h>
 
 static const TCHAR s_szName[] = TEXT("katahiromz ipaddr");
@@ -35,27 +37,31 @@ void PressTab(BOOL bShift = FALSE)
 {
     if (bShift)
     {
-        INPUT input = { INPUT_KEYBOARD };
+        INPUT input = { 0 };
+        input.type = INPUT_KEYBOARD;
         input.ki.wVk = VK_LSHIFT;
         input.ki.dwFlags = 0;
         SendInput(1, &input, sizeof(input));
     }
     {
-        INPUT input = { INPUT_KEYBOARD };
+        INPUT input = { 0 };
+        input.type = INPUT_KEYBOARD;
         input.ki.wVk = VK_TAB;
         input.ki.dwFlags = 0;
         SendInput(1, &input, sizeof(input));
     }
     Sleep(100);
     {
-        INPUT input = { INPUT_KEYBOARD };
+        INPUT input = { 0 };
+        input.type = INPUT_KEYBOARD;
         input.ki.wVk = VK_TAB;
         input.ki.dwFlags = KEYEVENTF_KEYUP;
         SendInput(1, &input, sizeof(input));
     }
     if (bShift)
     {
-        INPUT input = { INPUT_KEYBOARD };
+        INPUT input = { 0 };
+        input.type = INPUT_KEYBOARD;
         input.ki.wVk = VK_LSHIFT;
         input.ki.dwFlags = KEYEVENTF_KEYUP;
         SendInput(1, &input, sizeof(input));
@@ -63,16 +69,58 @@ void PressTab(BOOL bShift = FALSE)
     Sleep(100);
 }
 
+HWND s_hEdit1, s_hEdit2, s_hEdit3, s_hEdit4;
+
+unsigned __stdcall thread_proc(void *arg)
+{
+    HWND hwnd = (HWND)arg;
+    s_hEdit4 = GetTopWindow(s_hwndIPAddress);
+    s_hEdit3 = GetNextWindow(s_hEdit4, GW_HWNDNEXT);
+    s_hEdit2 = GetNextWindow(s_hEdit3, GW_HWNDNEXT);
+    s_hEdit1 = GetNextWindow(s_hEdit2, GW_HWNDNEXT);
+    printf("%p %p %p %p %p %p %p\n", hwnd, s_hwndButton, s_hwndIPAddress,
+        s_hEdit1, s_hEdit2, s_hEdit3, s_hEdit4);
+    PostMessage(hwnd, WM_COMMAND, 888, 0);
+
+    PressTab();
+    Sleep(500);
+    PostMessage(hwnd, WM_COMMAND, 777, 0);
+
+    PressTab();
+    Sleep(500);
+    PostMessage(hwnd, WM_COMMAND, 666, 0);
+
+    PressTab();
+    Sleep(500);
+    PostMessage(hwnd, WM_COMMAND, 555, 0);
+    return 0;
+}
+
 void OnCommand(HWND hwnd, int id, HWND hwndCtl, UINT codeNotify)
 {
-    if (id == 999)
+    switch (id)
     {
-        HWND hEdit4 = GetTopWindow(s_hwndIPAddress);
-        HWND hEdit3 = GetNextWindow(hEdit4, GW_HWNDNEXT);
-        HWND hEdit2 = GetNextWindow(hEdit3, GW_HWNDNEXT);
-        HWND hEdit1 = GetNextWindow(hEdit2, GW_HWNDNEXT);
-        SetFocus(hEdit1);
-        assert(GetFocus() == hEdit1);
+    case 999:
+        CloseHandle((HANDLE)_beginthreadex(NULL, 0, thread_proc, hwnd, 0, NULL));
+        break;
+    case 888:
+        printf("%p\n", GetFocus());
+        assert(GetFocus() == hwnd);
+        break;
+    case 777:
+        printf("%p\n", GetFocus());
+        assert(GetFocus() == s_hwndButton);
+        break;
+    case 666:
+        printf("%p\n", GetFocus());
+        assert(GetFocus() == s_hEdit1);
+        break;
+    case 555:
+        printf("%p\n", GetFocus());
+        assert(GetFocus() == s_hwndButton);
+        MessageBox(hwnd, TEXT("SUCCESS"), TEXT("SUCCESS"), MB_ICONINFORMATION);
+        DestroyWindow(hwnd);
+        break;
     }
 }
 
@@ -93,12 +141,10 @@ WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-INT WINAPI
-WinMain(HINSTANCE   hInstance,
-        HINSTANCE   hPrevInstance,
-        LPSTR       lpCmdLine,
-        INT         nCmdShow)
+int main(void)
 {
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+
     InitCommonControls();
 
     WNDCLASS wc;
